@@ -8,11 +8,16 @@ from sqlalchemy import (
     select
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+from nicegui import ui
 
 Base = declarative_base()
 
+# =======================
+# МОДЕЛИ БАЗЫ ДАННЫХ
+# =======================
+
 class Author(Base):
-    __tablename__ = "authors"
+    tablename = "authors"
 
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False, unique=True)
@@ -20,87 +25,189 @@ class Author(Base):
     books = relationship("Book", back_populates="author")
 
 
+class User(Base):
+    tablename = "users"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False, unique=True)
+
+    books = relationship("Book", back_populates="user")
+
+
 class Book(Base):
-    __tablename__ = "books"
+    tablename = "books"
 
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
+
+    # если True — книга в наличии
+    # если False — книга на руках
     is_available = Column(Boolean, default=True)
 
     author_id = Column(Integer, ForeignKey("authors.id"), nullable=False)
     author = relationship("Author", back_populates="books")
 
+    # пользователь, у которого книга на руках
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    user = relationship("User", back_populates="books")
 
-def init_db(db_url: str = "sqlite:///db.sqlite", echo: bool = False):
-    """
-    Создает таблицы и наполняет БД начальными данными,
-    если они еще не существуют.
-    """
-    engine = create_engine(db_url, echo=echo)
-    Session = sessionmaker(bind=engine)
 
-    Base.metadata.create_all(engine)
+# =======================
+# ИНИЦИАЛИЗАЦИЯ БД
+# =======================
 
-    session = Session()
+engine = create_engine("sqlite:///db.sqlite")
+Session = sessionmaker(bind=engine)
+Base.metadata.create_all(engine)
 
-    try:
-        author_exists = session.execute(
-            select(Author).limit(1)
-        ).scalar_one_or_none()
+session = Session()
 
-        if author_exists:
-            print("📚 База данных уже инициализирована — пропускаем заполнение")
-            return engine
+if not session.execute(select(Author).limit(1)).scalar_one_or_none():
+    authors = {
+        "Лев Толстой": Author(name="Лев Толстой"),
+        "Фёдор Достоевский": Author(name="Фёдор Достоевский"),
+        "Антон Чехов": Author(name="Антон Чехов"),
+        "Александр Пушкин": Author(name="Александр Пушкин"),
+    }
 
-        print("🛠 Инициализация базы данных...")
+    users = {
+        "Иванов И.И.": User(name="Иванов И.И."),
+        "Петров П.П.": User(name="Петров П.П."),
+    }
 
-        authors = {
-            "Лев Толстой": Author(name="Лев Толстой"),
-            "Фёдор Достоевский": Author(name="Фёдор Достоевский"),
-            "Антон Чехов": Author(name="Антон Чехов"),
-            "Александр Пушкин": Author(name="Александр Пушкин"),
-            "Николай Гоголь": Author(name="Николай Гоголь"),
-        }
+    session.add_all(authors.values())
+    session.add_all(users.values())
+    session.flush()
 
-        session.add_all(authors.values())
-        session.flush()
+    books = [
+        Book(
+            title="Евгений Онегин",
+            author=authors["Александр Пушкин"],
+            is_available=False,
+            user=users["Иванов И.И."]
+        ),
+        Book(
+            title="Война и мир",
+            author=authors["Лев Толстой"],
+            is_available=True
+        )
+    ]
 
-        books = [
-            Book(title="Война и мир", author=authors["Лев Толстой"], is_available=True),
-            Book(title="Анна Каренина", author=authors["Лев Толстой"], is_available=False),
-            Book(title="Воскресение", author=authors["Лев Толстой"], is_available=True),
+    session.add_all(books)
+    session.commit()
 
-            Book(title="Преступление и наказание", author=authors["Фёдор Достоевский"], is_available=True),
-            Book(title="Идиот", author=authors["Фёдор Достоевский"], is_available=True),
-            Book(title="Братья Карамазовы", author=authors["Фёдор Достоевский"], is_available=False),
-            Book(title="Бесы", author=authors["Фёдор Достоевский"], is_available=True),
 
-            Book(title="Вишнёвый сад", author=authors["Антон Чехов"], is_available=True),
-            Book(title="Чайка", author=authors["Антон Чехов"], is_available=False),
-            Book(title="Дама с собачкой", author=authors["Антон Чехов"], is_available=True),
+# =======================
+# ПУНКТ 1
+# UI ВОЗМОЖНОСТЬ ДОБАВЛЕНИЯ КНИГ
+# =======================
 
-            Book(title="Евгений Онегин", author=authors["Александр Пушкин"], is_available=True),
-            Book(title="Капитанская дочка", author=authors["Александр Пушкин"], is_available=True),
-            Book(title="Борис Годунов", author=authors["Александр Пушкин"], is_available=False),
+ui.label("➕ Добавление новой книги").classes("text-h5")
 
-            Book(title="Мёртвые души", author=authors["Николай Гоголь"], is_available=True),
-            Book(title="Ревизор", author=authors["Николай Гоголь"], is_available=True),
-            Book(title="Шинель", author=authors["Николай Гоголь"], is_available=False),
-            Book(title="Нос", author=authors["Николай Гоголь"], is_available=True),
+title_input = ui.input("Название книги")
+author_select = ui.select(
+    {a.name: a for a in session.execute(select(Author)).scalars()},
+    label="Автор"
+)
 
-            Book(title="Детство", author=authors["Лев Толстой"], is_available=True),
-            Book(title="Отрочество", author=authors["Лев Толстой"], is_available=True),
-            Book(title="Юность", author=authors["Лев Толстой"], is_available=False),
-        ]
+status_select = ui.select(
+    {"В наличии": True, "На руках": False},
+    label="Статус книги",
+    value=True
+)
 
-        session.add_all(books)
-        session.commit()
+user_select = ui.select(
+    {u.name: u for u in session.execute(select(User)).scalars()},
+    label="Читатель (если книга на руках)"
+)
 
-        print("✅ База данных успешно создана и заполнена")
+def add_book():
+    book = Book(
+        title=title_input.value,
+        author=author_select.value,
+        is_available=status_select.value,
+        user=None if status_select.value else user_select.value
+    )
+    session.add(book)
+    session.commit()
+    ui.notify("Книга добавлена")
 
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
-    return engine
+ui.button("Добавить книгу", on_click=add_book)
+
+ui.separator()
+
+# =======================
+# ПУНКТ 2
+# ОТОБРАЖЕНИЕ КНИГ СО СТАТУСОМ
+# (в наличии / на руках + кто взял)
+# =======================
+
+ui.label("📚 Список всех книг").classes("text-h5")
+
+def refresh_books():
+    table_rows.clear()
+    for book in session.execute(select(Book)).scalars():
+        status = (
+            "В наличии"
+            if book.is_available
+            else f"На руках у {book.user.name}"
+        )
+        table_rows.append({
+            "title": book.title,
+            "author": book.author.name,
+            "status": status
+        })
+
+table_rows = []
+
+ui.table(
+    columns=[
+        {"name": "title", "label": "Название", "field": "title"},
+        {"name": "author", "label": "Автор", "field": "author"},
+        {"name": "status", "label": "Статус", "field": "status"},
+    ],
+    rows=table_rows
+)
+
+ui.button("Обновить список книг", on_click=refresh_books)
+
+ui.separator()
+
+# =======================
+# ПУНКТ 3
+# ВЫБОР ПОЛЬЗОВАТЕЛЯ И ПРОСМОТР
+# ВСЕХ КНИГ, КОТОРЫЕ У НЕГО НА РУКАХ
+# =======================
+
+ui.label("👤 Книги выбранного читателя").classes("text-h5")
+
+user_filter = ui.select(
+    {u.name: u for u in session.execute(select(User)).scalars()},
+    label="Выберите читателя"
+)
+
+user_books_rows = []
+
+def show_user_books():
+    user_books_rows.clear()
+    books = session.execute(
+        select(Book).where(Book.user == user_filter.value)
+    ).scalars()
+
+    for book in books:
+        user_books_rows.append({
+            "title": book.title,
+            "author": book.author.name
+        })
+
+ui.table(
+    columns=[
+        {"name": "title", "label": "Название", "field": "title"},
+        {"name": "author", "label": "Автор", "field": "author"},
+    ],
+    rows=user_books_rows
+)
+
+ui.button("Показать книги читателя", on_click=show_user_books)
+
+ui.run()
