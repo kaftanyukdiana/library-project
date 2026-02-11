@@ -13,6 +13,43 @@ async def main_page():
     ui.label('📚 Библиотека').classes('text-3xl font-bold text-center mb-6')
 
     with ui.column().classes('w-full max-w-4xl mx-auto gap-6 p-4'):
+    
+    # ─── Добавление новой книги ──────────────────────────
+    ui.label('➕ Добавить новую книгу').classes('text-2xl font-semibold')
+
+    with ui.card().classes('w-full p-4 gap-3'):
+
+       title_input = ui.input(
+           label='Название книги',
+           placeholder='Введите название'
+       ).props('outlined')
+
+    (author_select = ui.select(
+        label='Автор',
+        options=={}
+    ).props('outlined')
+    with SessionLocal() as session:
+    authors = session.scalars(
+        select(Author).order_by(Author.name)
+    ).all()
+    author_select.options = {
+        author.name: author.id for author in authors
+    }
+    
+    status_select = ui.select(
+        label='Статус',
+        options={
+            'В наличии': True,
+            'Не в наличии': False
+        },
+        value=True
+    ).props('outlined')
+
+    ui.button(
+        'Добавить книгу',
+        icon='add',
+        on_click=lambda: add_book()
+    ).classes('mt-4')
 
         # ─── Поиск книг ───────────────────────────────────────
         with ui.row().classes('w-full items-center gap-4'):
@@ -56,7 +93,26 @@ async def main_page():
         ui.separator().classes('my-8')
 
     # Функция поиска (только по книгам)
-    async def perform_search(query: str):
+        async def perform_search(query: str):
+        async def add_book():
+    if not title_input.value or not author_select.value:
+        ui.notify('Заполните все поля', color='negative')
+        return
+
+    with SessionLocal() as session:
+        new_book = Book(
+            title=title_input.value,
+            author_id=author_select.value,
+            is_available=status_select.value
+        )
+        session.add(new_book)
+        session.commit()
+
+    title_input.value = ''
+    status_select.value = True
+
+        ui.notify('Книга успешно добавлена', color='positive')
+        
         if not query.strip():
             results_container.clear()
             with results_container:
