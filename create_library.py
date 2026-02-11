@@ -17,7 +17,7 @@ Base = declarative_base()
 # =======================
 
 class Author(Base):
-    tablename = "authors"
+    __tablename__ = "authors"
 
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False, unique=True)
@@ -26,7 +26,7 @@ class Author(Base):
 
 
 class User(Base):
-    tablename = "users"
+    __tablename__ = "users"
 
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False, unique=True)
@@ -35,7 +35,7 @@ class User(Base):
 
 
 class Book(Base):
-    tablename = "books"
+    __tablename__ = "books"
 
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
