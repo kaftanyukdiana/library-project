@@ -81,8 +81,13 @@ async def main_page():
                 with ui.column().classes('w-full gap-3'):
                     for book in books:
                         author = session.get(Author, book.author_id)
-                        status = "✅ В наличии" if book.is_available else "❌ Нет в наличии"
-                        color = "text-green-600" if book.is_available else "text-red-600"
+                        if book.is_available:
+                            status = "✅ В наличии"
+                            color = "text-green-600"
+                        else:
+                            user = book.user.name if book.user else "неизвестно"
+                            status = f"❌ На руках у {user}"
+                            color = "text-red-600"
 
                         with ui.row().classes('items-center justify-between w-full p-3 border rounded-lg'):
                             ui.label(f"{book.title} — {author.name if author else 'Автор неизвестен'}") \
