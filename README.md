@@ -40,3 +40,10 @@
 - create_library.py — модели базы данных и инициализация SQLite
 - library.sqlite — файл базы данных (создаётся автоматически)
 - requirements.txt — зависимости проекта
+# Запуск проекта
+1. Установить зависимости:
+   pip install -r requirements.txt
+2. Запустить приложение:
+   python app.py
+3. Открыть браузер:
+   http://localhost:8080
