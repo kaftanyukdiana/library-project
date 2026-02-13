@@ -156,9 +156,45 @@ async def main_page():
                         ui.label('Книг нет')
                     else:
                         for book in books:
-                            ui.label(book.title)
+    with ui.row().classes('justify-between w-full items-center'):
+        ui.label(book.title)
 
+        if book.is_available:
+            ui.button(
+                'Выдать',
+                icon='person_add',
+                on_click=lambda b=book: open_issue_dialog(b)
+            ).props('flat color=primary')
+        else:
+            ui.label('❌ Уже выдана').classes('text-red-500')
                 ui.button('Закрыть', on_click=dialog.close)
+                async def open_issue_dialog(book: Book):
+    with ui.dialog() as dialog, ui.card():
+        ui.label(f'Выдать книгу: {book.title}') \
+            .classes('text-xl font-bold mb-4')
+
+        last_name = ui.input('Фамилия').props('outlined')
+        first_name = ui.input('Имя').props('outlined')
+        phone = ui.input('Телефон').props('outlined')
+
+        async def issue():
+            if not last_name.value or not first_name.value or not phone.value:
+                ui.notify('Заполните все поля', color='negative')
+                return
+
+            with SessionLocal() as session:
+                book_in_db = session.get(Book, book.id)
+                book_in_db.is_available = False
+                session.commit()
+
+            ui.notify('Книга выдана', color='positive')
+            dialog.close()
+            await refresh_authors()
+
+        ui.button('Выдать книгу', on_click=issue) \
+            .classes('mt-4')
+
+    dialog.open()
 
 
 if __name__ in {"__main__", "__mp_main__"}:
