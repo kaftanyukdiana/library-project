@@ -9,6 +9,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from nicegui import ui
+from datetime import datetime
+from sqlalchemy import DateTime
 
 Base = declarative_base()
 
@@ -50,7 +52,20 @@ class Book(Base):
     # пользователь, у которого книга на руках
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     user = relationship("User", back_populates="books")
+    
+    
+class Borrowing(Base):
+    __tablename__ = "borrowings"
 
+    id = Column(Integer, primary_key=True)
+    book_id = Column(Integer, ForeignKey("books.id"), nullable=False)
+    last_name = Column(String, nullable=False)
+    first_name = Column(String, nullable=False)
+    phone = Column(String, nullable=False)
+    borrowed_at = Column(DateTime, default=datetime.utcnow)
+    returned_at = Column(DateTime, nullable=True)
+
+    book = relationship("Book")
 
 # =======================
 # ИНИЦИАЛИЗАЦИЯ БД
