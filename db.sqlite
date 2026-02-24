@@ -1,0 +1,99 @@
+from sqlalchemy import (
+    Boolean,
+    Column,
+    ForeignKey,
+    Integer,
+    String,
+    create_engine,
+    inspect,
+    select,
+    text,
+    update,
+)
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+
+Base = declarative_base()
+
+
+class Author(Base):
+    __tablename__ = "authors"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False, unique=True)
+
+    books = relationship("Book", back_populates="author")
+
+
+class Reader(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False, unique=True)
+
+    books = relationship("Book", back_populates="reader")
+
+
+class Book(Base):
+    __tablename__ = "books"
+
+    id = Column(Integer, primary_key=True)
+    title = Column(String, nullable=False)
+    is_available = Column(Boolean, default=True, nullable=False)
+    author_id = Column(Integer, ForeignKey("authors.id"), nullable=False)
+    reader_id = Column("user_id", Integer, ForeignKey("users.id"), nullable=True)
+
+    author = relationship("Author", back_populates="books")
+    reader = relationship("Reader", back_populates="books")
+
+
+def _ensure_legacy_schema_compatibility(engine) -> None:
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+
+    if "users" not in tables:
+        Reader.__table__.create(bind=engine)
+
+    books_columns = {column["name"] for column in inspect(engine).get_columns("books")}
+    if "user_id" not in books_columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE books ADD COLUMN user_id INTEGER"))
+
+
+def init_db(echo: bool = False, db_url: str = "sqlite:///db.sqlite"):
+    engine = create_engine(db_url, echo=echo)
+    Base.metadata.create_all(engine)
+    _ensure_legacy_schema_compatibility(engine)
+
+    session_factory = sessionmaker(bind=engine)
+    with session_factory() as session:
+        has_authors = session.scalar(select(Author.id).limit(1)) is not None
+        if not has_authors:
+            session.add_all(
+                [
+                    Author(name="Leo Tolstoy"),
+                    Author(name="Fyodor Dostoevsky"),
+                    Author(name="Anton Chekhov"),
+                    Author(name="Alexander Pushkin"),
+                ]
+            )
+            session.commit()
+
+        unknown_reader = session.scalar(
+            select(Reader).where(Reader.name == "ÐÐµ ÑÐºÐ°Ð·Ð°Ð½")
+        )
+        if unknown_reader is None:
+            unknown_reader = Reader(name="ÐÐµ ÑÐºÐ°Ð·Ð°Ð½")
+            session.add(unknown_reader)
+            session.flush()
+
+        session.execute(
+            update(Book)
+            .where(Book.is_available.is_(False), Book.reader_id.is_(None))
+            .values(reader_id=unknown_reader.id)
+        )
+        session.commit()
+
+    return engine
+
+
+__all__ = ["init_db", "Author", "Book", "Reader", "Base"]
