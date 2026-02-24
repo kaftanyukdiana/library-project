@@ -126,7 +126,7 @@ author_select = ui.select(
 )
 
 status_select = ui.select(
-    {"В наличии": True, "На руках": False},
+    {True: "В наличии", False: "На руках"},
     label="Статус книги",
     value=True
 )
@@ -224,5 +224,4 @@ ui.table(
 )
 
 ui.button("Показать книги читателя", on_click=show_user_books)
-
 ui.run()
